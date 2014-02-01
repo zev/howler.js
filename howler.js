@@ -39,6 +39,21 @@
     masterGain.connect(ctx.destination);
   }
 
+
+  // check for browser codec support
+  var audioTest = null;
+  if (!noAudio) {
+    audioTest = new Audio();
+    var codecs = {
+      mp3: !!audioTest.canPlayType('audio/mpeg;').replace(/^no$/, ''),
+      opus: !!audioTest.canPlayType('audio/ogg; codecs="opus"').replace(/^no$/, ''),
+      ogg: !!audioTest.canPlayType('audio/ogg; codecs="vorbis"').replace(/^no$/, ''),
+      wav: !!audioTest.canPlayType('audio/wav; codecs="1"').replace(/^no$/, ''),
+      m4a: !!(audioTest.canPlayType('audio/x-m4a;') || audioTest.canPlayType('audio/aac;')).replace(/^no$/, ''),
+      weba: !!audioTest.canPlayType('audio/webm; codecs="vorbis"').replace(/^no$/, '')
+    };
+  }
+
   // create global controller
   var HowlerGlobal = function() {
     this._volume = 1;
@@ -123,25 +138,33 @@
           }
         }
       }
+    },
+
+    usingWebAudio: function() {
+      return usingWebAudio;
+    },
+
+    noAudio: function() {
+      return noAudio;
+    },
+
+    codecs: function() {
+      return codecs;
+      if(!Object.keys) {
+        // ideally we would return an immutable copy of this
+        return codecs;
+      } else {
+        newCodecs = {};
+        for (var k in Object.keys(codecs)) {
+          newCodecs[k] = codecs[k];
+        }
+        return newCodecs;
+      }
     }
   };
 
   // allow access to the global audio controls
   var Howler = new HowlerGlobal();
-
-  // check for browser codec support
-  var audioTest = null;
-  if (!noAudio) {
-    audioTest = new Audio();
-    var codecs = {
-      mp3: !!audioTest.canPlayType('audio/mpeg;').replace(/^no$/, ''),
-      opus: !!audioTest.canPlayType('audio/ogg; codecs="opus"').replace(/^no$/, ''),
-      ogg: !!audioTest.canPlayType('audio/ogg; codecs="vorbis"').replace(/^no$/, ''),
-      wav: !!audioTest.canPlayType('audio/wav; codecs="1"').replace(/^no$/, ''),
-      m4a: !!(audioTest.canPlayType('audio/x-m4a;') || audioTest.canPlayType('audio/aac;')).replace(/^no$/, ''),
-      weba: !!audioTest.canPlayType('audio/webm; codecs="vorbis"').replace(/^no$/, '')
-    };
-  }
 
   // setup the audio object
   var Howl = function(o) {
@@ -198,12 +221,12 @@
 
       // if no audio is available, quit immediately
       if (noAudio) {
-        self.on('loaderror');
+        self.on('loaderror', 'Audio is not available');
         return;
       }
 
       // loop through source URLs and pick the first one that is compatible
-      for (var i=0; i<self._urls.length; i++) {        
+      for (var i=0; i<self._urls.length; i++) {
         var ext, urlItem;
 
         if (self._format) {
@@ -218,7 +241,7 @@
           if (ext) {
             ext = ext[1];
           } else {
-            self.on('loaderror');
+            self.on('loaderror', 'No supported audio codec was found');
             return;
           }
         }
@@ -230,7 +253,7 @@
       }
 
       if (!url) {
-        self.on('loaderror');
+        self.on('loaderror', 'Could not detect a url that can play a supported codec');
         return;
       }
 
@@ -247,7 +270,7 @@
         newNode._pos = 0;
         newNode.preload = 'auto';
         newNode.volume = (Howler._muted) ? 0 : self._volume * Howler.volume();
-       
+
         // add this sound to the cache
         cache[url] = self;
 
@@ -1110,13 +1133,17 @@
               }
             },
             function(err) {
-              obj.on('loaderror');
+              obj.on('loaderror', 'Loading ' + url + ' failed with error ' + err);
             }
           );
         };
-        xhr.onerror = function() {
+        xhr.onerror = function(err) {
+          // Should come up with a good way to message this type of error
+          // console.log("xhr on error for " + url, err);
+          // console.log(xhr);
           // if there is an error, switch the sound to HTML Audio
           if (obj._webAudio) {
+            console.log("xhr obj is ", obj);
             obj._buffer = true;
             obj._webAudio = false;
             obj._audioNode = [];
@@ -1192,9 +1219,9 @@
       };
     });
   }
-  
+
   // define globally in case AMD is not available or available but not used
   window.Howler = Howler;
   window.Howl = Howl;
-  
+
 })();
