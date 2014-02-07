@@ -1123,32 +1123,37 @@
         xhr.open('GET', url, true);
         xhr.responseType = 'arraybuffer';
         xhr.onload = function() {
-          // decode the buffer into an audio source
-          ctx.decodeAudioData(
-            xhr.response,
-            function(buffer) {
-              if (buffer) {
-                cache[url] = buffer;
-                loadSound(obj, buffer);
+          // We can only load up valid data so error on 400's and above
+          if (xhr.status >= 400) {
+            obj.on('loaderror', 'Cannot load ' + url + ' http response ' + xhr.status);
+          } else {
+            // decode the buffer into an audio source
+            ctx.decodeAudioData(
+              xhr.response,
+              function(buffer) {
+                if (buffer) {
+                  cache[url] = buffer;
+                  loadSound(obj, buffer);
+                }
+              },
+              function(err) {
+                obj.on('loaderror', 'Loading ' + url + ' failed with error ' + err);
               }
-            },
-            function(err) {
-              obj.on('loaderror', 'Loading ' + url + ' failed with error ' + err);
-            }
-          );
+            );
+          }
         };
         xhr.onerror = function(err) {
-          // Should come up with a good way to message this type of error
-          // console.log("xhr on error for " + url, err);
-          // console.log(xhr);
           // if there is an error, switch the sound to HTML Audio
           if (obj._webAudio) {
-            console.log("xhr obj is ", obj);
             obj._buffer = true;
             obj._webAudio = false;
             obj._audioNode = [];
             delete obj._gainNode;
-            obj.load();
+            try {
+              obj.load();
+            } catch (e) {
+              obj.on('loaderror', 'Cannot fall back to html audio failing');
+            }
           }
         };
         try {
