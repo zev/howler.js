@@ -297,6 +297,10 @@
           newNode.removeEventListener('canplaythrough', listener, false);
         };
         newNode.addEventListener('canplaythrough', listener, false);
+        newNode.addEventListener('error', function() {
+          self.on('loaderror', 'HTML5 Audio cannot load either.');
+        }, false);
+
         newNode.load();
       }
 
